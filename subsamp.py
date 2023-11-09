@@ -11,7 +11,7 @@ def histogram_equalize(img):
     img_cdf, bin_centers = exposure.cumulative_distribution(img)
     return np.interp(img, bin_centers, img_cdf)
 
-img = "acs_full.tiff"#sys.argv[1]
+img = sys.argv[1]
 
 #im1 = np.array(Image.open(img), dtype=int)
 #plt.imshow(im1,cmap="gray")
