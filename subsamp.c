@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
     int height = atoi(argv[2]);
     const char *file_name = argv[1];
     long size = 0;
-    int save_half = 1;
+    int save_half = 0;
 
     // Image dimensions
     int total_height = 0;
