@@ -12,6 +12,7 @@ def histogram_equalize(img):
     return np.interp(img, bin_centers, img_cdf)
 
 img = sys.argv[1]
+# img = "ImageBand4.tif"
 
 #im1 = np.array(Image.open(img), dtype=int)
 #plt.imshow(im1,cmap="gray")

@@ -1,5 +1,8 @@
 from PIL import Image
+import matplotlib.pyplot as plt
 import os
+import numpy as np
+import matplotlib as mpl
 
 def compare_images(image_path1, image_path2):
     img1 = Image.open(image_path1)
@@ -18,22 +21,18 @@ def compare_images(image_path1, image_path2):
 # Dimensions
 width = 4096
 height = 2000
-bytespp = 4
+bytespp = 1
 
 # Equal
-with open('acs_full_equal_C.bin', 'rb') as file:
-    data = file.read()
+data = (np.fromfile("acs_full_equal_C.bin", dtype=np.float32)).reshape((height, width))
 
-image = Image.frombytes('RGBA', (width, height), data)
-image.save('acs_full_equal_C.tiff')
+mpl.image.imsave("acs_full_equal_C.tiff",data)
 os.remove('acs_full_equal_C.bin')
 
 # ACS half
-with open('acs_half_C.bin', 'rb') as file:
-    data = file.read()
+data = (np.fromfile("acs_half_C.bin", dtype=np.float32)).reshape(int(height/20), int(width/20) + 1)
 
-image = Image.frombytes('RGBA', (int(width/20) + 1, int(height/20)), data)
-image.save('acs_half_C.tiff')
+mpl.image.imsave("acs_half_C.tiff",data)
 os.remove('acs_half_C.bin')
 
 if compare_images('acs_full_equal_C.tiff', 'acs_full_equal.tiff'):
