@@ -15,81 +15,41 @@ void cumsum(float *array, int size) {
 }
 
 int main(int argc, char *argv[]) {
-    long size = 0;
-
-    // Image dimensions
-    int total_height = 0;
-    int width = 4096;
-    int bytespp = 2;
-
     if (argc != 3 || atoi(argv[2]) % 20 != 0) {
         printf("Use: %s <file.tiff> <height (divisible by 20)>\n", argv[0]);
         return 1;
     }
-
     int height = atoi(argv[2]);
-
     const char *file_name = argv[1];
-    FILE *files = fopen(file_name, "rb");
-    
+    long size = 0;
+    int save_half = 1;
 
-    if (files == NULL) {
+    // Image dimensions
+    int total_height = 0;
+    int th = 0;
+    int width = 4096;
+    int bytespp = 2;
+
+    // Size
+    FILE *file_size  = fopen(file_name, "rb");
+    
+    if (file_size == NULL) {
         printf("Error while opening the file %s\n", file_name);
         return 1;
     } else {
-        fseek(files, 0, SEEK_END);
-        size = ftell(files);
-        fclose(files);
+        fseek(file_size , 0, SEEK_END);
+        size = ftell(file_size );
+        fclose(file_size );
         total_height = size / (width*bytespp);
+        th = total_height;
     }
 
-    FILE *fileint = fopen(file_name, "rb");
-    fseek(fileint, size % (width*bytespp), SEEK_SET);
-
-    float hist[65536] = {0};
-    uint16_t slot;
-    for (int i = 0; i < total_height * width; i++) {
-        if (fread(&slot, sizeof(uint16_t), 1, fileint) != 1) {
-            printf("Error while reading the file %s\n", file_name);
-            fclose(fileint);
-            return 1;
-        } else {
-            hist[slot] += 1;
-        }
-    }
-
-    cumsum(hist, 65536);
-    // uint8_t hist_int[65536];
-    // for (int i = 0; i < 65536; i++) {
-    //     hist_int[i] = (uint8_t) hist[i];
-    // }
-
-    fclose(fileint);
-    FILE *fileint2 = fopen(file_name, "rb");
-    fseek(fileint2, size % (width*bytespp), SEEK_SET);
-    FILE *filefe = fopen("acs_full_equal_C.bin", "wb");
-    if (filefe) {
-        
-        for (int i = 0; i < total_height; i++) {
-            for (int j = 0; j < width; j++) {
-                if (fread(&slot, sizeof(uint16_t), 1, fileint2) != 1) {
-                    printf("Error while reading the file %s\n", file_name);
-                    return 1;
-                }
-                fwrite(&hist[slot], sizeof(float), 1, filefe);
-            }
-        }
-    } else {
-        printf("Couldn't open acs_full_equal_C.bin.\n");
-    }
+    FILE *file = fopen(file_name, "rb");
+    fseek(file, size % (width*bytespp), SEEK_SET);
     
-    fclose(fileint2);
-    fclose(filefe);
-
-    FILE *fbin2 = fopen("acs_half_C.bin", "wb");
-    fclose(fbin2);
-
-    FILE *file = fopen("acs_full_equal_C.bin", "rb");
+    // Subsample
+    FILE *file_bin_op = fopen("half_C.bin", "wb");
+    fclose(file_bin_op);
 
     int cycles = total_height / height;
     for (int p = 0; p <= cycles; p++) {
@@ -97,15 +57,15 @@ int main(int argc, char *argv[]) {
             height = total_height;
         }
         if(height <= 0) break;
-        float image[height][width];
-        float im2[height / 20][width / 20 + 1];
+        uint16_t im1[height][width];
+        uint16_t im2[height / 20][width / 20 + 1];
 
         // Read TIFF
         total_height -= height;
         for (int i = 0; i < height; i++) {
             for (int j = 0; j < width; j++) {
-                if (fread(&image[i][j], sizeof(float), 1, file) != 1) {
-                    printf("Error while reading the file %s\n", "acs_full_equal_C.bin");
+                if (fread(&im1[i][j], sizeof(uint16_t), 1, file) != 1) {
+                    printf("Error while reading the file %s\n", "equal_C.bin");
                     fclose(file);
                     return 1;
                 }
@@ -115,21 +75,67 @@ int main(int argc, char *argv[]) {
         // "Decimate"
         for (int i = 0; i < height; i += 20) {
             for (int j = 0; j < width + 4; j += 20) {
-                im2[i / 20][j / 20] = image[i][j];
+                im2[i / 20][j / 20] = im1[i][j];
             }
         }
 
-        FILE *file2 = fopen("acs_half_C.bin", "ab");
-        if (file2) {
-            fwrite(im2, sizeof(float), height * (width + 4) / 400, file2);
-            fclose(file2);
+        FILE *file_bin = fopen("half_C.bin", "ab");
+        if (file_bin) {
+            fwrite(im2, sizeof(uint16_t), height * (width + 4) / 400, file_bin);
+            fclose(file_bin);
         } else {
-            printf("Couldn't open acs_half_C.bin.\n");
+            printf("Couldn't open half_C.bin.\n");
         }
 
     }
 
     fclose(file);
+    
+    // Histogram
+    FILE *file_hist = fopen("half_C.bin", "rb");
+    float cdf[65536] = {0};
+    uint16_t slot;
+    total_height = th * (width + 4) / 400;
+
+    for (int i = 0; i < total_height; i++) {
+        if (fread(&slot, sizeof(uint16_t), 1, file_hist) != 1) {
+            printf("Error while reading the file %s\n", "half_C.bin");
+            fclose(file_hist);
+            return 1;
+        } else {
+            cdf[slot] += 1;
+        }
+    }
+
+    cumsum(cdf, 65536);
+
+    fclose(file_hist);
+
+    // Histogram equalize
+    FILE *file_hist_2 = fopen("half_C.bin", "rb");
+    FILE *file_equal = fopen("equal_C.bin", "wb");
+
+    if (file_equal) {
+        for (int i = 0; i < total_height; i++) {
+            if (fread(&slot, sizeof(uint16_t), 1, file_hist_2) != 1) {
+                printf("Error while reading the file %s\n", "half_C.bin");
+                return 1;
+            }
+            fwrite(&cdf[slot], sizeof(float), 1, file_equal);
+        }
+    } else {
+        printf("Couldn't open equal_C.bin.\n");
+    }
+    
+    fclose(file_hist_2);
+    fclose(file_equal);
+
+    if (!save_half) {
+        if (remove("half_C.bin") != 0) {
+            perror("Error removing the file");
+        }
+    }
+
     return 0;
 }
 

@@ -21,8 +21,9 @@ img = sys.argv[1]
 #im1 = np.array(Image.open(img+"/ImageBand4.tif"), dtype=int)
 im1 = np.array(Image.open(img), dtype=int)
 
-im1 = histogram_equalize(im1)
-im1 = im1[:2000]
+im1 = im1[::20, ::20]
+im2 = histogram_equalize(im1)
+# im2 = im2[:2000]
 
 sz = np.shape(im1)
 print(sz)
@@ -30,11 +31,10 @@ print(sz)
 plt.figure()
 plt.imshow(im1)
 
-im2 = im1[::20, ::20]
 plt.figure()
 plt.imshow(im2)
 
-mpl.image.imsave("acs_full_equal.tiff",im1)
-mpl.image.imsave("acs_half.tiff",im2)
+mpl.image.imsave("half.tiff",im1)
+mpl.image.imsave("equal.tiff",im2)
 
 plt.show()
